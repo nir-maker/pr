@@ -2,109 +2,92 @@
 <html lang="he">
 <head>
   <meta charset="UTF-8">
-  <title>טופס טעינת טבלאות</title>
+  <title>טעינת טבלאות – CSV & PapaParse</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body {
-      direction: rtl;
-      font-family: Arial, sans-serif;
-      padding: 20px;
-      background: #f5f5f5;
-    }
-    .phone a {
-      font-weight: bold;
-      text-decoration: none;
-      color: #007acc;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 15px;
-    }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 8px;
-      text-align: right;
-    }
-    th {
-      background: #e0e0e0;
-    }
+    body { direction: rtl; font-family: Arial, sans-serif; padding:20px; background: #f5f5f5 }
+    h1 { margin-bottom: 10px }
+    label { display: block; margin-top: 15px }
+    select { padding: 5px; font-size: 1rem }
+    .phone a { font-weight:bold; text-decoration:none; color:#007acc }
+    table { width:100%; border-collapse:collapse; margin-top:15px; background:#fff }
+    th, td { border:1px solid #ccc; padding:8px; text-align:right }
+    th { background:#e0e0e0 }
+    #table-container p { margin-top:15px }
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/tabletop.js/1.5.1/tabletop.min.js"></script>
+  <!-- ספריית PapaParse לפרסור CSV -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
 </head>
-<body onload="init()">
+<body>
 
   <h1>טעינת טבלת קשר – הורים</h1>
 
   <label for="sheet-select">בחרו גיליון:</label>
   <select id="sheet-select">
-    <option value="">-- טוען גיליונות --</option>
+    <option value="">-- בחר --</option>
+    <option value="עברית">עברית</option>
+    <option value="אנגלית">אנגלית</option>
+    <option value="מתמטיקה">מתמטיקה</option>
   </select>
 
   <div id="table-container"></div>
 
   <script>
-    // ודאו שאתם מארחים את הדף דרך HTTP/HTTPS (למשל GitHub Pages או שרת מקומי)
-    const SPREADSHEET_ID = '2PACX-1vS_d_c2UYLRQAJA0U4Qrm-gYK8NImqDjPogi5-7vHSfcchXDXvL_UfuKiBdVvcYsdggVga729TzDxap';
-    let tabletopGlobal = null;
-    const dataCache = {};
+    // מפה של שם גיליון → URL ישיר ל-CSV (export)
+    const SHEET_URLS = {
+      'עברית':    'https://docs.google.com/spreadsheets/d/1VoQBSimPLd_UNnWSs5gZQIYSZZcWoRuD4gRN5TiF-vk/export?format=csv&gid=0',
+      'אנגלית':   'https://docs.google.com/spreadsheets/d/1VoQBSimPLd_UNnWSs5gZQIYSZZcWoRuD4gRN5TiF-vk/export?format=csv&gid=2060198480',
+      'מתמטיקה':  'https://docs.google.com/spreadsheets/d/1VoQBSimPLd_UNnWSs5gZQIYSZZcWoRuD4gRN5TiF-vk/export?format=csv&gid=1590831470'
+    };
 
-    function init() {
-      Tabletop.init({
-        key: SPREADSHEET_ID,
-        callback: onData,
-        simpleSheet: false,
-        debug: true
-      });
-    }
+    const select = document.getElementById('sheet-select');
+    const container = document.getElementById('table-container');
 
-    function onData(data, tabletop) {
-      tabletopGlobal = tabletop;
-      const select = document.getElementById('sheet-select');
-      const container = document.getElementById('table-container');
+    select.addEventListener('change', async () => {
+      const name = select.value;
+      container.innerHTML = ''; 
+      if (!name) return;
 
-      // מלא את התפריט בשמות הגיליונות
-      const sheets = Object.keys(tabletop.sheets());
-      select.innerHTML = '<option value="">-- בחר גיליון --</option>';
-      sheets.forEach(name => {
-        const opt = document.createElement('option');
-        opt.value = name;
-        opt.textContent = name;
-        select.appendChild(opt);
-      });
-
-      // מאזין לשינוי
-      select.addEventListener('change', () => {
-        const sheetName = select.value;
-        container.innerHTML = '';
-        if (!sheetName) return;
-        if (dataCache[sheetName]) {
-          renderTable(dataCache[sheetName]);
-        } else {
-          const rows = tabletopGlobal.sheets(sheetName).all();
-          dataCache[sheetName] = rows;
-          renderTable(rows);
-        }
-      });
-    }
-
-    function renderTable(rows) {
-      const container = document.getElementById('table-container');
-      if (!rows.length) {
-        container.innerHTML = '<p>אין נתונים להציג בגיליון זה.</p>';
+      const url = SHEET_URLS[name];
+      if (!url) {
+        container.innerHTML = '<p style="color:red;">לא הוגדרה URL לגיליון זה.</p>';
         return;
       }
+
+      container.innerHTML = '<p>טוען נתונים...</p>';
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const text = await res.text();
+        const parsed = Papa.parse(text, {
+          header: true,
+          skipEmptyLines: true
+        });
+        renderTable(parsed.data);
+      } catch (e) {
+        container.innerHTML = `<p style="color:red;">שגיאה בטעינת הגיליון: ${e.message}</p>`;
+        console.error(e);
+      }
+    });
+
+    function renderTable(rows) {
+      container.innerHTML = '';
+      if (!rows.length) {
+        container.innerHTML = '<p>אין נתונים להציג.</p>';
+        return;
+      }
+
+      // בונים את הטבלה
       const fields = Object.keys(rows[0]);
-      console.log('Rendering table for fields:', fields);
       const table = document.createElement('table');
       const thead = document.createElement('thead');
-      const headerRow = document.createElement('tr');
+      const trh = document.createElement('tr');
       fields.forEach(f => {
         const th = document.createElement('th');
         th.textContent = f;
-        headerRow.appendChild(th);
+        trh.appendChild(th);
       });
-      thead.appendChild(headerRow);
+      thead.appendChild(trh);
       table.appendChild(thead);
 
       const tbody = document.createElement('tbody');
@@ -112,15 +95,15 @@
         const tr = document.createElement('tr');
         fields.forEach(f => {
           const td = document.createElement('td');
-          const text = r[f] || '';
-          if (f.toLowerCase().includes('טלפון')) {
+          const val = r[f] || '';
+          if (f.includes('טלפון')) {
             const a = document.createElement('a');
-            a.href = 'tel:' + text.replace(/\D/g, '');
-            a.textContent = text;
-            td.classList.add('phone');
+            a.href = 'tel:' + val.replace(/\D/g, '');
+            a.textContent = val;
+            a.classList.add('phone');
             td.appendChild(a);
           } else {
-            td.textContent = text;
+            td.textContent = val;
           }
           tr.appendChild(td);
         });
