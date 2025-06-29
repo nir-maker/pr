@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+  <meta charset="UTF-8">
+  <title>טופס טעינת טבלאות</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      direction: rtl;
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .phone a {
+      font-weight: bold;
+      text-decoration: none;
+      color: #007acc;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: right;
+    }
+    th {
+      background: #e0e0e0;
+    }
+  </style>
+  <!-- טוענים את ספריית Tabletop.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tabletop.js/1.5.1/tabletop.min.js"></script>
+</head>
+<body>
+
+  <h1>טעינת טבלת קשר – הורים</h1>
+
+  <label for="sheet-select">בחרו גיליון:</label>
+  <select id="sheet-select">
+    <option value="">-- בחר --</option>
+    <option value="מתמטיקה">מתמטיקה</option>
+    <option value="אנגלית">אנגלית</option>
+    <option value="עברית">עברית</option>
+  </select>
+
+  <div id="table-container"></div>
+
+  <script>
+    // ה-Spreadsheet ID מתוך ה-URL שציינת
+    const SPREADSHEET_ID = '2PACX-1vS_d_c2UYLRQAJA0U4Qrm-gYK8NImqDjPogi5-7vHSfcchXDXvL_UfuKiBdVvcYsdggVga729TzDxap';
+
+    let dataCache = {};
+
+    document.getElementById('sheet-select').addEventListener('change', function() {
+      const sheetName = this.value;
+      const container = document.getElementById('table-container');
+      container.innerHTML = ''; // מנקים קודם
+
+      if (!sheetName) return;
+
+      if (dataCache[sheetName]) {
+        renderTable(dataCache[sheetName]);
+      } else {
+        Tabletop.init({
+          key: SPREADSHEET_ID,
+          simpleSheet: false,
+          wanted: [sheetName],
+          callback: function(data, tabletop) {
+            const rows = tabletop.sheets(sheetName).all();
+            dataCache[sheetName] = rows;
+            renderTable(rows);
+          }
+        });
+      }
+    });
+
+    function renderTable(rows) {
+      const container = document.getElementById('table-container');
+      if (!rows.length) {
+        container.innerHTML = '<p>אין נתונים להציג.</p>';
+        return;
+      }
+
+      const fields = Object.keys(rows[0]);
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      fields.forEach(f => {
+        const th = document.createElement('th');
+        th.textContent = f;
+        headerRow.appendChild(th);
+      });
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        fields.forEach(f => {
+          const td = document.createElement('td');
+          let text = r[f] || '';
+          if (f.includes('טלפון')) {
+            const a = document.createElement('a');
+            a.href = 'tel:' + text.replace(/\D/g, '');
+            a.textContent = text;
+            td.classList.add('phone');
+            td.appendChild(a);
+          } else {
+            td.textContent = text;
+          }
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+
+      container.appendChild(table);
+    }
+  </script>
+
+</body>
+</html>
