@@ -30,60 +30,72 @@
       background: #e0e0e0;
     }
   </style>
-  <!-- טוענים את ספריית Tabletop.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tabletop.js/1.5.1/tabletop.min.js"></script>
 </head>
-<body>
+<body onload="init()">
 
   <h1>טעינת טבלת קשר – הורים</h1>
 
   <label for="sheet-select">בחרו גיליון:</label>
   <select id="sheet-select">
-    <option value="">-- בחר --</option>
-    <option value="מתמטיקה">מתמטיקה</option>
-    <option value="אנגלית">אנגלית</option>
-    <option value="עברית">עברית</option>
+    <option value="">-- טוען גיליונות --</option>
   </select>
 
   <div id="table-container"></div>
 
   <script>
-    // ה-Spreadsheet ID מתוך ה-URL שציינת
+    // ודאו שאתם מארחים את הדף דרך HTTP/HTTPS (למשל GitHub Pages או שרת מקומי)
     const SPREADSHEET_ID = '2PACX-1vS_d_c2UYLRQAJA0U4Qrm-gYK8NImqDjPogi5-7vHSfcchXDXvL_UfuKiBdVvcYsdggVga729TzDxap';
+    let tabletopGlobal = null;
+    const dataCache = {};
 
-    let dataCache = {};
+    function init() {
+      Tabletop.init({
+        key: SPREADSHEET_ID,
+        callback: onData,
+        simpleSheet: false,
+        debug: true
+      });
+    }
 
-    document.getElementById('sheet-select').addEventListener('change', function() {
-      const sheetName = this.value;
+    function onData(data, tabletop) {
+      tabletopGlobal = tabletop;
+      const select = document.getElementById('sheet-select');
       const container = document.getElementById('table-container');
-      container.innerHTML = ''; // מנקים קודם
 
-      if (!sheetName) return;
+      // מלא את התפריט בשמות הגיליונות
+      const sheets = Object.keys(tabletop.sheets());
+      select.innerHTML = '<option value="">-- בחר גיליון --</option>';
+      sheets.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        select.appendChild(opt);
+      });
 
-      if (dataCache[sheetName]) {
-        renderTable(dataCache[sheetName]);
-      } else {
-        Tabletop.init({
-          key: SPREADSHEET_ID,
-          simpleSheet: false,
-          wanted: [sheetName],
-          callback: function(data, tabletop) {
-            const rows = tabletop.sheets(sheetName).all();
-            dataCache[sheetName] = rows;
-            renderTable(rows);
-          }
-        });
-      }
-    });
+      // מאזין לשינוי
+      select.addEventListener('change', () => {
+        const sheetName = select.value;
+        container.innerHTML = '';
+        if (!sheetName) return;
+        if (dataCache[sheetName]) {
+          renderTable(dataCache[sheetName]);
+        } else {
+          const rows = tabletopGlobal.sheets(sheetName).all();
+          dataCache[sheetName] = rows;
+          renderTable(rows);
+        }
+      });
+    }
 
     function renderTable(rows) {
       const container = document.getElementById('table-container');
       if (!rows.length) {
-        container.innerHTML = '<p>אין נתונים להציג.</p>';
+        container.innerHTML = '<p>אין נתונים להציג בגיליון זה.</p>';
         return;
       }
-
       const fields = Object.keys(rows[0]);
+      console.log('Rendering table for fields:', fields);
       const table = document.createElement('table');
       const thead = document.createElement('thead');
       const headerRow = document.createElement('tr');
@@ -100,8 +112,8 @@
         const tr = document.createElement('tr');
         fields.forEach(f => {
           const td = document.createElement('td');
-          let text = r[f] || '';
-          if (f.includes('טלפון')) {
+          const text = r[f] || '';
+          if (f.toLowerCase().includes('טלפון')) {
             const a = document.createElement('a');
             a.href = 'tel:' + text.replace(/\D/g, '');
             a.textContent = text;
@@ -115,7 +127,6 @@
         tbody.appendChild(tr);
       });
       table.appendChild(tbody);
-
       container.appendChild(table);
     }
   </script>
